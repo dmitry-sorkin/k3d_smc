@@ -15,13 +15,14 @@ const minLineLength = 20.0
 const angle = 45.0
 const spacing = 0.5
 const modelHeight = 3.0
+const travelSpeed = 30
 
 var (
 	// Variables from web interface
-	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la                                                                                                    float64
-	firmware, travelSpeed, hotendTemperature, bedTemperature, cooling, firstLayerSpeed, printSpeed, numSegments, flow, slowAcceleration, startAcceleration, endAcceleration int
-	bedProbe, retracted, delta                                                                                                                                              bool
-	startGcode, endGcode                                                                                                                                                    string
+	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la                                                                                       float64
+	firmware, hotendTemperature, bedTemperature, cooling, firstLayerSpeed, printSpeed, numSegments, flow, slowAcceleration, startAcceleration, endAcceleration int
+	bedProbe, retracted, delta                                                                                                                                 bool
+	startGcode, endGcode                                                                                                                                       string
 	// Current variables
 	currentCoordinates Point
 	currentSpeed       int
