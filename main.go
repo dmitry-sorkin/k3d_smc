@@ -12,17 +12,15 @@ const filamentDiameter = 1.75
 const retractLength = 2.0
 const retractSpeed = 20
 const minLineLength = 20.0
-const angle = 45.0
-const spacing = 0.5
+const angle = 15.0
 const modelHeight = 3.0
-const travelSpeed = 30
 
 var (
 	// Variables from web interface
-	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la                                                                                       float64
-	firmware, hotendTemperature, bedTemperature, cooling, firstLayerSpeed, printSpeed, numSegments, flow, slowAcceleration, startAcceleration, endAcceleration int
-	bedProbe, retracted, delta                                                                                                                                 bool
-	startGcode, endGcode                                                                                                                                       string
+	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la, spacing                                                                                           float64
+	firmware, hotendTemperature, bedTemperature, cooling, firstLayerSpeed, printSpeed, travelSpeed, numSegments, flow, slowAcceleration, startAcceleration, endAcceleration int
+	bedProbe, retracted, delta                                                                                                                                              bool
+	startGcode, endGcode                                                                                                                                                    string
 	// Current variables
 	currentCoordinates Point
 	currentSpeed       int
@@ -266,6 +264,7 @@ func check(showErrorBox bool, allowModify bool) bool {
 		curErr, hasErr = lang.Call("getString", "error.line_width.value").String(), true
 	} else {
 		lineWidth = docLineWidth
+		spacing = 0.85 * lineWidth
 	}
 
 	setErrorDescription(doc, lang, "table.line_width.description", curErr, hasErr, allowModify)
@@ -298,6 +297,7 @@ func check(showErrorBox bool, allowModify bool) bool {
 		curErr, hasErr = lang.Call("getString", "error.print_speed.value").String(), true
 	} else {
 		printSpeed = docPrintSpeed
+		travelSpeed = printSpeed
 	}
 
 	setErrorDescription(doc, lang, "table.print_speed.description", curErr, hasErr, allowModify)
@@ -462,15 +462,9 @@ func generate(this js.Value, i []js.Value) interface{} {
 		fmt.Sprintf(";Print speed: %d [mm/s]\n", printSpeed),
 		caliParams)
 
-	var g29str string
-	if bedProbe {
-		g29str = "G29"
-	} else {
-		g29str = ""
-	}
 	replacer := strings.NewReplacer("$BEDTEMP", strconv.Itoa(bedTemperature),
 		"$HOTTEMP", strconv.Itoa(hotendTemperature),
-		"$G29", g29str,
+		"$G29", generateBedProbeCommand(),
 		"$FLOW", strconv.Itoa(flow))
 	write(replacer.Replace(startGcode), "\n")
 
@@ -488,6 +482,9 @@ func generate(this js.Value, i []js.Value) interface{} {
 
 	// set slow acceleration for 1st layer
 	write(generateAccelerationCommand(slowAcceleration))
+
+	// set LA k-factor
+	write(generateLACommand(la))
 
 	// generate first layer
 	var bedCenter Point
@@ -511,8 +508,7 @@ func generate(this js.Value, i []js.Value) interface{} {
 	halfAngleRadians := angle * math.Pi / 360
 	stepWidth := 2 * minLineLength * math.Sin(halfAngleRadians)
 	modelSizeX := stepWidth * float64(numSegments)
-	spacingY := spacing / math.Sin(halfAngleRadians)
-	modelSizeY := minLineLength*math.Cos(halfAngleRadians) + spacingY
+	modelSizeY := minLineLength*math.Cos(halfAngleRadians) + spacing
 
 	println(fmt.Sprintf("stepWidth: %s; modelSizeX: %s; modelSizeY: %s", fmt.Sprint(roundFloat(stepWidth, 2)), fmt.Sprint(roundFloat(modelSizeX, 2)), fmt.Sprint(roundFloat(modelSizeY, 2))))
 
@@ -565,6 +561,11 @@ func generate(this js.Value, i []js.Value) interface{} {
 		// modify model start point Z coordinate
 		modelStartPoint.Z += layerHeight
 
+		// if current layer == 2 => turn fan on
+		if currentCoordinates.Z/layerHeight == 2 {
+			write(fmt.Sprintf("M106 S%d\n", cooling))
+		}
+
 		// move to start of calibration model
 		if currentCoordinates.Z == layerHeight*2 {
 			// generate retraction only when moving from raft to model
@@ -581,19 +582,24 @@ func generate(this js.Value, i []js.Value) interface{} {
 			// set segment acceleration
 			write(generateAccelerationCommand(startAcceleration + curSegment*int(deltaAcceleration)))
 			// m
-			write(generateRelativeMove(stepWidth/2, -modelSizeY+spacingY, 0.0, lineWidth, printSpeed))
-			write(generateRelativeMove(stepWidth/2, modelSizeY-spacingY, 0.0, lineWidth, printSpeed))
+			write(generateRelativeMove(stepWidth/2, -modelSizeY+spacing, 0.0, lineWidth, printSpeed))
+			write(generateRelativeMove(stepWidth/2, modelSizeY-spacing, 0.0, lineWidth, printSpeed))
 		}
 		// set slow acceleration for lower perimeter
 		write(generateAccelerationCommand(slowAcceleration))
 
-		// generate lower perimeters
-		write(generateRelativeMove(0.0, -spacingY, 0.0, lineWidth, printSpeed))
-		for curSegment := numSegments; curSegment > 0; curSegment-- {
-			write(generateRelativeMove(-stepWidth/2, -modelSizeY+spacingY, 0.0, lineWidth, printSpeed))
-			write(generateRelativeMove(-stepWidth/2, modelSizeY-spacingY, 0.0, lineWidth, printSpeed))
-		}
-		write(generateRelativeMove(0.0, spacingY, 0.0, lineWidth, printSpeed))
+		// print lower line
+		write(generateRelativeMove(0.0, -modelSizeY, 0.0, lineWidth, printSpeed))
+		write(generateRelativeMove(-modelSizeX, 0.0, 0.0, lineWidth, printSpeed))
+		write(generateRelativeMove(0.0, modelSizeY, 0.0, lineWidth, printSpeed))
+
+		// 	// generate lower perimeters
+		// 	write(generateRelativeMove(0.0, -spacing, 0.0, lineWidth, printSpeed))
+		// 	for curSegment := numSegments; curSegment > 0; curSegment-- {
+		// 		write(generateRelativeMove(-stepWidth/2, -modelSizeY+spacing, 0.0, lineWidth, printSpeed))
+		// 		write(generateRelativeMove(-stepWidth/2, modelSizeY-spacing, 0.0, lineWidth, printSpeed))
+		// 	}
+		// 	write(generateRelativeMove(0.0, spacing, 0.0, lineWidth, printSpeed))
 	}
 
 	// end gcode
@@ -629,6 +635,19 @@ func generateLACommand(kFactor float64) string {
 	}
 
 	return ";no firmware information\n"
+}
+
+func generateBedProbeCommand() string {
+	if !bedProbe {
+		return ""
+	}
+	if firmware == 0 || firmware == 2 {
+		// Marlin of RRF
+		return "G29"
+	} else if firmware == 1 {
+		return "BED_MESH_CALIBRATE"
+	}
+	return ""
 }
 
 func generateRelativeMove(x, y, z, width float64, speed int) string {

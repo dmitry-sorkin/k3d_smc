@@ -82,7 +82,6 @@ function destroyClickedElement(event) {
 }
 
 var formFields = [
-	// Параметры принтера
     "k3d_smc_bedX",
     "k3d_smc_bedY",
     "k3d_smc_firmwareMarlin",
@@ -90,21 +89,21 @@ var formFields = [
     "k3d_smc_firmwareRRF",
     "k3d_smc_delta",
     "k3d_smc_bedProbe",
-	// Параметры филамента
 	"k3d_smc_hotendTemperature",
 	"k3d_smc_bedTemperature",
 	"k3d_smc_cooling",
 	"k3d_smc_flow",
 	"k3d_smc_la",
-	// Параметры первого слоя
 	"k3d_smc_firstLayerSpeed",
 	"k3d_smc_firstLayerLineWidth",
 	"k3d_smc_zOffset",
-	// Параметры модели
 	"k3d_smc_lineWidth",
 	"k3d_smc_layerHeight",
 	"k3d_smc_printSpeed",
-	"k3d_smc_slowAcceleration"
+	"k3d_smc_slowAcceleration",
+	"k3d_smc_startAcceleration",
+	"k3d_smc_endAcceleration",
+	"k3d_smc_numSegments",
 ];
 var segmentFields = [
 	"k3d_smc_startAcceleration",
@@ -122,7 +121,7 @@ var saveForm = function () {
         var element = document.getElementById(elementId);
         if (element) {
             var saveValue = element.value;
-            if (elementId == 'k3d_smc_delta' || elementId == 'k3d_smc_g29') {
+            if (elementId == 'k3d_smc_delta' || elementId == 'k3d_smc_bedProbe') {
                 saveValue = element.checked;
             }
             localStorage.setItem(elementId, saveValue);
@@ -139,7 +138,7 @@ function loadForm() {
 
         var element = document.getElementById(elementId);
         if (element) {
-            if (elementId == 'k3d_smc_delta' || elementId == 'k3d_smc_g29') {
+            if (elementId == 'k3d_smc_delta' || elementId == 'k3d_smc_bedProbe') {
                 if (loadValue == 'true') {
                     element.checked = true;
                 } else {
