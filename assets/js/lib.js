@@ -112,8 +112,8 @@ var segmentFields = [
 	"k3d_smc_numSegments"
 ];
 var segmentKeys = [
-	"init_acc",
-	"end_acc",
+	"start_acceleration",
+	"end_acceleration",
 	"num_segments"
 ];
 
@@ -241,11 +241,11 @@ function initLang(key) {
 			
 			// Параметры первого слоя
 
-			values['table.first_line_width.title'] = 'Ширина линии первого слоя';
-			values['table.first_line_width.description'] = '[мм] Ширина линий, с которой будет напечатана подложка под моделью. В общем случае рекомендуется выставить 150% от диаметра сопла';
+			values['table.first_layer_line_width.title'] = 'Ширина линии первого слоя';
+			values['table.first_layer_line_width.description'] = '[мм] Ширина линий, с которой будет напечатана подложка под моделью. В общем случае рекомендуется выставить 150% от диаметра сопла';
 			
-			values['table.first_print_speed.title'] = 'Скорость печати первого слоя';
-			values['table.first_print_speed.description'] = '[мм/с] Скорость, с которой будет напечатана подложка';
+			values['table.first_layer_print_speed.title'] = 'Скорость печати первого слоя';
+			values['table.first_layer_print_speed.description'] = '[мм/с] Скорость, с которой будет напечатана подложка';
 			
 			values['table.z_offset.title'] = 'Z-offset';
 			values['table.z_offset.description'] = '[мм] Смещение всей модели по вертикали. Нужно чтобы компенсировать слишком тонкую/толстую калибровку первого слоя. В общем случае оставьте ноль';
@@ -263,6 +263,12 @@ function initLang(key) {
 			
 			values['table.end_gcode.title'] = 'Конечный G-код';
 			values['table.end_gcode.description'] = 'Код, выполняемый после печати теста. Менять на свой страх и риск!';
+
+			values['table.print_speed.title'] = 'Скорость печати';
+			values['table.print_speed.description'] = '[мм/с^2] Начальное значение ускорение для калибровки';
+
+			values['table.slow_acceleration.title'] = 'Ускорение для медленных сегментов';
+			values['table.slow_acceleration.description'] = '[мм/с^2] Ускорение, которое будет использоваться при печати подложки, а также медленных сегментов модели. Обязательно должно быть небольшим (<1000мм/с^2), иначе калибровка будет непоказательна.';
 			
 			// Параметры калибровки
 
@@ -315,8 +321,8 @@ function initLang(key) {
 
 			// Ошибки параметров первого слоя
 
-			values['error.first_line_width.format'] = 'Ширина линии первого слоя - ошибка формата';
-			values['error.first_line_width.value'] = 'Неправильная ширина линии первого слоя (меньше 0.1 или больше 2.0 мм)';
+			values['error.first_layer_line_width.format'] = 'Ширина линии первого слоя - ошибка формата';
+			values['error.first_layer_line_width.value'] = 'Неправильная ширина линии первого слоя (меньше 0.1 или больше 2.0 мм)';
 
 			values['error.first_layer_speed.format'] = 'Скорость печати первого слоя - ошибка формата';
 			values['error.first_layer_speed.slow_or_fast'] = 'Скорость печати первого слоя неправильная (меньше 10 или больше 1000 мм/с)';

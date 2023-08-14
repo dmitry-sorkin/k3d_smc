@@ -12,12 +12,13 @@ const filamentDiameter = 1.75
 const retractLength = 2.0
 const retractSpeed = 20
 const minLineLength = 20.0
-const angle = 90.0
-const spacing = 1.0
+const angle = 45.0
+const spacing = 0.5
+const modelHeight = 3.0
 
 var (
 	// Variables from web interface
-	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la, modelHeight                                                                                       float64
+	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la                                                                                                    float64
 	firmware, travelSpeed, hotendTemperature, bedTemperature, cooling, firstLayerSpeed, printSpeed, numSegments, flow, slowAcceleration, startAcceleration, endAcceleration int
 	bedProbe, retracted, delta                                                                                                                                              bool
 	startGcode, endGcode                                                                                                                                                    string
@@ -70,7 +71,7 @@ func check(showErrorBox bool, allowModify bool) bool {
 	hasErr := false
 	retErr := false
 
-	docBedX, err := parseInputToFloat(doc.Call("getElementById", "k3d_la_bedX").Get("value").String())
+	docBedX, err := parseInputToFloat(doc.Call("getElementById", "k3d_smc_bedX").Get("value").String())
 	if err != nil {
 		curErr, hasErr = lang.Call("getString", "error.bed_size_x.format").String(), true
 	} else if docBedX < 100 || docBedX > 1000 {
@@ -117,7 +118,7 @@ func check(showErrorBox bool, allowModify bool) bool {
 
 	delta = doc.Call("getElementById", "k3d_smc_delta").Get("checked").Bool()
 
-	bedProbe = doc.Call("getElementById", "k3d_smc_g29").Get("checked").Bool()
+	bedProbe = doc.Call("getElementById", "k3d_smc_bedProbe").Get("checked").Bool()
 
 	// Параметры филамента
 
@@ -371,8 +372,8 @@ func check(showErrorBox bool, allowModify bool) bool {
 		retErr = true
 	}
 
-	startGcode = doc.Call("getElementById", "k3d_la_startGcode").Get("value").String()
-	endGcode = doc.Call("getElementById", "k3d_la_endGcode").Get("value").String()
+	startGcode = doc.Call("getElementById", "k3d_smc_startGcode").Get("value").String()
+	endGcode = doc.Call("getElementById", "k3d_smc_endGcode").Get("value").String()
 
 	if !showErrorBox {
 		return !retErr
@@ -438,7 +439,7 @@ func generate(this js.Value, i []js.Value) interface{} {
 		caliParams += fmt.Sprintf(segmentStr, numSegments-i, fmt.Sprint(roundFloat(float64(endAcceleration)-deltaAcceleration*float64(i), 3)))
 	}
 
-	fileName := fmt.Sprintf("K3D_SMC_H%d-B%d_%d-%d_d%s.gcode", hotendTemperature, bedTemperature, startAcceleration, endAcceleration, int(roundFloat(deltaAcceleration, 2)))
+	fileName := fmt.Sprintf("K3D_SMC_H%d-B%d_%d-%d_d%d.gcode", hotendTemperature, bedTemperature, startAcceleration, endAcceleration, int(roundFloat(deltaAcceleration, 2)))
 	js.Global().Call("beginSaveFile", fileName)
 
 	// gcode initialization
@@ -506,9 +507,13 @@ func generate(this js.Value, i []js.Value) interface{} {
 	currentCoordinates.Z = layerHeight
 
 	// calculate model parameters
-	stepWidth := 2 * minLineLength * math.Sin(angle/2)
+	halfAngleRadians := angle * math.Pi / 360
+	stepWidth := 2 * minLineLength * math.Sin(halfAngleRadians)
 	modelSizeX := stepWidth * float64(numSegments)
-	modelSizeY := minLineLength * math.Cos(angle/2)
+	spacingY := spacing / math.Sin(halfAngleRadians)
+	modelSizeY := minLineLength*math.Cos(halfAngleRadians) + spacingY
+
+	println(fmt.Sprintf("stepWidth: %s; modelSizeX: %s; modelSizeY: %s", fmt.Sprint(roundFloat(stepWidth, 2)), fmt.Sprint(roundFloat(modelSizeX, 2)), fmt.Sprint(roundFloat(modelSizeY, 2))))
 
 	// purge nozzle
 	var purgeStart Point
@@ -530,8 +535,10 @@ func generate(this js.Value, i []js.Value) interface{} {
 
 	// generate raft trajectory
 	// calc raft size
-	raftSizeX := modelSizeX + lineWidth/2
-	raftSizeY := modelSizeY + lineWidth/2
+	raftSizeX := modelSizeX + lineWidth/2 + 4
+	raftSizeY := modelSizeY + lineWidth/2 + 4
+	println(fmt.Sprintf("raftSizeX: %s; raftSizeY: %s", fmt.Sprint(roundFloat(raftSizeX, 2)), fmt.Sprint(roundFloat(raftSizeY, 2))))
+
 	// move to raft start
 	var point0 Point
 	point0.X, point0.Y, point0.Z = bedCenter.X-raftSizeX/2, bedCenter.Y+raftSizeY/2, layerHeight
@@ -573,21 +580,19 @@ func generate(this js.Value, i []js.Value) interface{} {
 			// set segment acceleration
 			write(generateAccelerationCommand(startAcceleration + curSegment*int(deltaAcceleration)))
 			// m
-			write(generateRelativeMove(stepWidth/2, -modelSizeY, 0.0, lineWidth, printSpeed))
-			write(generateRelativeMove(stepWidth/2, modelSizeY, 0.0, lineWidth, printSpeed))
+			write(generateRelativeMove(stepWidth/2, -modelSizeY+spacingY, 0.0, lineWidth, printSpeed))
+			write(generateRelativeMove(stepWidth/2, modelSizeY-spacingY, 0.0, lineWidth, printSpeed))
 		}
 		// set slow acceleration for lower perimeter
 		write(generateAccelerationCommand(slowAcceleration))
 
-		// move to lower perimeters
-		write(generateRelativeMove(0.0, -spacing/math.Sin(angle/2), 0.0, lineWidth, printSpeed))
-		for curSegment := numSegments; curSegment >= 0; curSegment-- {
-			write(generateRelativeMove(-stepWidth/2, -modelSizeY, 0.0, lineWidth, printSpeed))
-			write(generateRelativeMove(-stepWidth/2, modelSizeY, 0.0, lineWidth, printSpeed))
+		// generate lower perimeters
+		write(generateRelativeMove(0.0, -spacingY, 0.0, lineWidth, printSpeed))
+		for curSegment := numSegments; curSegment > 0; curSegment-- {
+			write(generateRelativeMove(-stepWidth/2, -modelSizeY+spacingY, 0.0, lineWidth, printSpeed))
+			write(generateRelativeMove(-stepWidth/2, modelSizeY-spacingY, 0.0, lineWidth, printSpeed))
 		}
-
-		// print last line
-		write(generateRelativeMove(0.0, spacing/math.Sin(angle/2), 0.0, lineWidth, printSpeed))
+		write(generateRelativeMove(0.0, spacingY, 0.0, lineWidth, printSpeed))
 	}
 
 	// end gcode
