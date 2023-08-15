@@ -12,8 +12,8 @@ const filamentDiameter = 1.75
 const retractLength = 2.0
 const retractSpeed = 20
 const minLineLength = 20.0
-const angle = 15.0
-const modelHeight = 3.0
+const angle = 30.0
+const modelHeight = 2.0
 
 var (
 	// Variables from web interface
