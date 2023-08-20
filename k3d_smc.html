@@ -121,6 +121,11 @@
       </tr>
       <!-- Параметры калибровки -->
       <tr>
+        <td class="lang" id="table.angle.title">Угол поворота</td>
+        <td><input type="text" id="k3d_smc_angle" value="90"></td>
+        <td class="lang" id="table.angle.description">[°] Угол поворота, на котором будет проверяться величина скругления</td>
+      </tr>
+      <tr>
         <td class="lang" id="table.start_acceleration.title">Начальное значение ускорения</td>
         <td><input type="text" id="k3d_smc_startAcceleration" value="1000"></td>
         <td class="lang" id="table.start_acceleration.description">[мм/с^2] Начальное значение ускорение для калибровки</td>
@@ -135,6 +140,8 @@
         <td><input type="text" id="k3d_smc_numSegments" value="10"></td>
         <td class="lang" id="table.num_segments.description">Количество сегментов для проверки</td>
       </tr>
+
+      <!-- G-коды -->
       <tr>
         <td class="lang" id="table.start_gcode.title">Начальный G-код</td>
 		<!-- It can't be formatted, otherwise formatting breaks in the browser :( -->

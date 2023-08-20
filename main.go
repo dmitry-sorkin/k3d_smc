@@ -12,12 +12,12 @@ const filamentDiameter = 1.75
 const retractLength = 2.0
 const retractSpeed = 20
 const minLineLength = 20.0
-const angle = 30.0
-const modelHeight = 2.0
+const modelHeight = 4.0
+const perimeterOverlap = 0.15 // 15%
 
 var (
 	// Variables from web interface
-	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la, spacing                                                                                           float64
+	bedX, bedY, zOffset, firstLayerLineWidth, lineWidth, layerHeight, la, spacing, overlap, angle                                                                           float64
 	firmware, hotendTemperature, bedTemperature, cooling, firstLayerSpeed, printSpeed, travelSpeed, numSegments, flow, slowAcceleration, startAcceleration, endAcceleration int
 	bedProbe, retracted, delta                                                                                                                                              bool
 	startGcode, endGcode                                                                                                                                                    string
@@ -264,7 +264,6 @@ func check(showErrorBox bool, allowModify bool) bool {
 		curErr, hasErr = lang.Call("getString", "error.line_width.value").String(), true
 	} else {
 		lineWidth = docLineWidth
-		spacing = 0.85 * lineWidth
 	}
 
 	setErrorDescription(doc, lang, "table.line_width.description", curErr, hasErr, allowModify)
@@ -325,6 +324,22 @@ func check(showErrorBox bool, allowModify bool) bool {
 
 	// Параметры калибровки
 
+	docAngle, err := parseInputToFloat(doc.Call("getElementById", "k3d_smc_angle").Get("value").String())
+	if err != nil {
+		curErr, hasErr = lang.Call("getString", "error.angle.format").String(), true
+	} else if docAngle < 15 || docAngle > 120 {
+		curErr, hasErr = lang.Call("getString", "error.angle.value").String(), true
+	} else {
+		angle = docAngle
+	}
+
+	setErrorDescription(doc, lang, "table.angle.description", curErr, hasErr, allowModify)
+	if hasErr {
+		errorString = errorString + curErr + "\n"
+		hasErr = false
+		retErr = true
+	}
+
 	docStartAcceleration, err := parseInputToInt(doc.Call("getElementById", "k3d_smc_startAcceleration").Get("value").String())
 	if err != nil {
 		curErr, hasErr = lang.Call("getString", "error.start_acceleration.format").String(), true
@@ -362,6 +377,8 @@ func check(showErrorBox bool, allowModify bool) bool {
 		curErr, hasErr = lang.Call("getString", "error.num_segments.format").String(), true
 	} else if docNumSegment < 2 || docNumSegment > 100 {
 		curErr, hasErr = lang.Call("getString", "error.num_segments.value").String(), true
+	} else if float64(docNumSegment)*2*minLineLength*math.Sin(angle*math.Pi/360) >= float64(bedX-6) {
+		curErr, hasErr = lang.Call("getString", "error.num_segments.too_much").String(), true
 	} else {
 		numSegments = docNumSegment
 	}
@@ -440,7 +457,7 @@ func generate(this js.Value, i []js.Value) interface{} {
 		caliParams += fmt.Sprintf(segmentStr, numSegments-i, fmt.Sprint(roundFloat(float64(endAcceleration)-deltaAcceleration*float64(i), 3)))
 	}
 
-	fileName := fmt.Sprintf("K3D_SMC_H%d-B%d_%d-%d_d%d.gcode", hotendTemperature, bedTemperature, startAcceleration, endAcceleration, int(roundFloat(deltaAcceleration, 2)))
+	fileName := fmt.Sprintf("K3D_ACC_H%d-B%d_%d-%d_d%d_o%s.gcode", hotendTemperature, bedTemperature, startAcceleration, endAcceleration, int(roundFloat(deltaAcceleration, 2)), fmt.Sprint(roundFloat(overlap*100, 0)))
 	js.Global().Call("beginSaveFile", fileName)
 
 	// gcode initialization
@@ -505,6 +522,7 @@ func generate(this js.Value, i []js.Value) interface{} {
 	currentCoordinates.Z = layerHeight
 
 	// calculate model parameters
+	spacing = (1 - overlap) * lineWidth
 	halfAngleRadians := angle * math.Pi / 360
 	stepWidth := 2 * minLineLength * math.Sin(halfAngleRadians)
 	modelSizeX := stepWidth * float64(numSegments)
@@ -580,26 +598,30 @@ func generate(this js.Value, i []js.Value) interface{} {
 		// generate upper model perimeters
 		for curSegment := 0; curSegment < numSegments; curSegment++ {
 			// set segment acceleration
-			write(generateAccelerationCommand(startAcceleration + curSegment*int(deltaAcceleration)))
-			// m
+			if currentCoordinates.Z >= modelHeight/2 {
+				write(generateAccelerationCommand(startAcceleration + curSegment*int(deltaAcceleration)))
+			}
+			// print segment
 			write(generateRelativeMove(stepWidth/2, -modelSizeY+spacing, 0.0, lineWidth, printSpeed))
 			write(generateRelativeMove(stepWidth/2, modelSizeY-spacing, 0.0, lineWidth, printSpeed))
 		}
-		// set slow acceleration for lower perimeter
-		write(generateAccelerationCommand(slowAcceleration))
 
-		// print lower line
-		write(generateRelativeMove(0.0, -modelSizeY, 0.0, lineWidth, printSpeed))
-		write(generateRelativeMove(-modelSizeX, 0.0, 0.0, lineWidth, printSpeed))
-		write(generateRelativeMove(0.0, modelSizeY, 0.0, lineWidth, printSpeed))
+		// move to next perimeter
+		write(generateRelativeMove(0.0, -spacing, 0.0, lineWidth, printSpeed))
 
-		// 	// generate lower perimeters
-		// 	write(generateRelativeMove(0.0, -spacing, 0.0, lineWidth, printSpeed))
-		// 	for curSegment := numSegments; curSegment > 0; curSegment-- {
-		// 		write(generateRelativeMove(-stepWidth/2, -modelSizeY+spacing, 0.0, lineWidth, printSpeed))
-		// 		write(generateRelativeMove(-stepWidth/2, modelSizeY-spacing, 0.0, lineWidth, printSpeed))
-		// 	}
-		// 	write(generateRelativeMove(0.0, spacing, 0.0, lineWidth, printSpeed))
+		// generate lower model perimeters
+		for curSegment := numSegments; curSegment > 0; curSegment-- {
+			// set segment acceleration
+			if currentCoordinates.Z >= modelHeight/2 {
+				write(generateAccelerationCommand(startAcceleration + curSegment*int(deltaAcceleration)))
+			}
+			// print segment
+			write(generateRelativeMove(-stepWidth/2, -modelSizeY+spacing, 0.0, lineWidth, printSpeed))
+			write(generateRelativeMove(-stepWidth/2, modelSizeY-spacing, 0.0, lineWidth, printSpeed))
+		}
+
+		// last layer move
+		write(generateRelativeMove(0.0, spacing, 0.0, lineWidth, printSpeed))
 	}
 
 	// end gcode

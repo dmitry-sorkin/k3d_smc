@@ -1,4 +1,4 @@
-const calibrator_version = 'v0.1';
+const calibrator_version = 'v0.2';
 window.calibrator_version = calibrator_version;
 var savedSegmentsInfo = null;
 
@@ -104,6 +104,7 @@ var formFields = [
 	"k3d_smc_startAcceleration",
 	"k3d_smc_endAcceleration",
 	"k3d_smc_numSegments",
+	"k3d_smc_angle"
 ];
 var segmentFields = [
 	"k3d_smc_startAcceleration",
@@ -271,6 +272,9 @@ function initLang(key) {
 			
 			// Параметры калибровки
 
+			values['table.angle.title'] = 'Угол поворота';
+			values['table.angle.description'] = '[°] Угол поворота, на котором будет проверяться величина скругления';
+			
 			values['table.num_segments.title'] = 'Количество сегментов';
 			values['table.num_segments.description'] = 'Количество сегментов башенки. В течение сегмента коэффициент LA остаётся неизменным. Сегменты визуально разделены для упрощения анализа модели';
 
@@ -279,7 +283,7 @@ function initLang(key) {
 
 			values['table.end_acceleration.title'] = 'Конечное значение ускорения';
 			values['table.end_acceleration.description'] = '[мм/с^2] Конечное значение ускорения для калибровки';
-
+			
 			// Генератор
 			
 			values['generator.generate_and_download'] = 'Генерировать и скачать';		
@@ -345,14 +349,18 @@ function initLang(key) {
 
 			// Ошибки параметров калибровки
 
-			values['error.start_acceleration.title'] = 'Начальное значение ускорения - ошибка формата';
+			values['error.angle.format'] = 'Угол поворота - ошибка формата';
+			values['error.angle.value'] = 'Угол поворота указано неверно (меньше 15 или больше 120)';
+
+			values['error.start_acceleration.format'] = 'Начальное значение ускорения - ошибка формата';
 			values['error.start_acceleration.value'] = 'Начальное значение ускорения указано неверно (меньше 100 или больше 50000 мм/с^2)';
 
-			values['error.end_acceleration.title'] = 'Конечное значение ускорения - ошибка формата';
+			values['error.end_acceleration.format'] = 'Конечное значение ускорения - ошибка формата';
 			values['error.end_acceleration.value'] = 'Конечное значение ускорения указано неверно (меньше 100 или больше 50000 мм/с^2)';
 
 			values['error.num_segments.format'] = 'Количество сегментов - ошибка формата';
 			values['error.num_segments.value'] = 'Количество сегментов неправильное (меньше 2 или больше 100)';
+			values['error.num_segments.too_much'] = 'Количество сегментов слишком большое - модель не поместится на стол';
 
 			break;
 	}
